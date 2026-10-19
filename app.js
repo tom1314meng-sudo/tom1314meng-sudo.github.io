@@ -117,3 +117,63 @@ const screenResize=new ResizeObserver(()=>requestAnimationFrame(fitScreen));
 screens.forEach(screen=>screenResize.observe(screen.element.firstElementChild));
 window.addEventListener('resize',fitScreen);
 selectScreen(location.hash==='#projects'?'projects':location.hash==='#resume'?'skills':'intro');
+
+// Automatic presentation with reading time and explicit playback control.
+screenNav.hidden = true;
+const playback = document.createElement('div');
+playback.className = 'playback';
+playback.setAttribute('role','group');
+playback.setAttribute('aria-label','简历轮播控制');
+playback.innerHTML = '<button class="slide-prev" aria-label="上一屏">‹</button><span class="slide-caption"></span><button class="slide-toggle" aria-label="暂停自动轮播">暂停</button><button class="slide-next" aria-label="下一屏">›</button><span class="slide-progress" aria-hidden="true"><i></i></span>';
+document.querySelector('footer').before(playback);
+let playing = !reduced;
+let slideTimer = null;
+let carouselIndex = screens.findIndex(screen => screen.element === activeScreen);
+const caption = playback.querySelector('.slide-caption');
+const toggle = playback.querySelector('.slide-toggle');
+function refreshPlayback(){
+  const screen = screens[carouselIndex];
+  caption.textContent = `0${carouselIndex+1} / 0${screens.length} · ${screen.label}`;
+  toggle.textContent = playing ? '暂停' : '播放';
+  toggle.setAttribute('aria-label',playing?'暂停自动轮播':'开始自动轮播');
+  clearTimeout(slideTimer);
+  playback.classList.remove('playing');
+  const duration = screen.id === 'projects' ? 22000 : screen.id === 'career' ? 18000 : 12000;
+  playback.style.setProperty('--slide-duration',duration+'ms');
+  void playback.offsetWidth;
+  if(playing && !document.hidden){
+    playback.classList.add('playing');
+    slideTimer=setTimeout(()=>advanceSlide(1,true),duration);
+  }
+}
+function advanceSlide(direction,automatic=false){
+  // Give a running equipment demonstration enough time to finish.
+  if(running || inspecting){slideTimer=setTimeout(()=>advanceSlide(direction,automatic),1000);return;}
+  if(automatic && screens[carouselIndex].id==='projects'){
+    const current=projectCards.findIndex(card=>!card.hidden);
+    if(current<projectCards.length-1){
+      projectCards.forEach((card,index)=>{card.hidden=index!==current+1;picker.children[index].setAttribute('aria-pressed',String(index===current+1));});
+      requestAnimationFrame(fitScreen);refreshPlayback();return;
+    }
+  }
+  carouselIndex=(carouselIndex+direction+screens.length)%screens.length;
+  if(screens[carouselIndex].id==='projects'){
+    projectCards.forEach((card,index)=>{card.hidden=index!==0;picker.children[index].setAttribute('aria-pressed',String(index===0));});
+  }
+  selectScreen(screens[carouselIndex].id);
+}
+const selectBeforeCarousel = selectScreen;
+selectScreen = function(id,focus=false){
+  selectBeforeCarousel(id,focus);
+  carouselIndex=screens.findIndex(screen=>screen.id===id);
+  refreshPlayback();
+};
+playback.querySelector('.slide-prev').addEventListener('click',()=>advanceSlide(-1));
+playback.querySelector('.slide-next').addEventListener('click',()=>advanceSlide(1));
+toggle.addEventListener('click',()=>{playing=!playing;refreshPlayback();});
+// Interacting with content pauses the presentation so reading is never interrupted.
+main.addEventListener('click',()=>{playing=false;refreshPlayback();});
+main.addEventListener('keydown',()=>{playing=false;refreshPlayback();});
+document.addEventListener('visibilitychange',refreshPlayback);
+refreshPlayback();
+requestAnimationFrame(fitScreen);
