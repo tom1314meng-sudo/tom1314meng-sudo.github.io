@@ -43,3 +43,77 @@ if (!reduced && 'IntersectionObserver' in window) {
     observer.observe(el);
   });
 }
+
+// All resume sections share a single viewport; resize fits the active section.
+const main = document.querySelector('main');
+const introSection = main.querySelector('.intro');
+const workspaceSection = main.querySelector('.workspace');
+const skillsSection = main.querySelector('.details');
+const projectsSection = main.querySelector('.project-section');
+const careerSection = main.querySelector('.career');
+const educationSection = main.querySelector('.education');
+const contactSection = main.querySelector('.contact');
+const screenNav = document.createElement('div');
+screenNav.className = 'screen-nav';
+screenNav.setAttribute('role','navigation');
+screenNav.setAttribute('aria-label','简历页面');
+document.querySelector('header').after(screenNav);
+const screens = [
+  {id:'intro', label:'个人介绍', nodes:[introSection]},
+  {id:'demo', label:'交互演示', nodes:[workspaceSection]},
+  {id:'skills', label:'技术能力', nodes:[skillsSection]},
+  {id:'projects', label:'项目经历', nodes:[projectsSection]},
+  {id:'career', label:'工作履历', nodes:[careerSection]},
+  {id:'contact', label:'教育 / 联系', nodes:[educationSection,contactSection]}
+];
+let activeScreen = null;
+function fitScreen(){
+  if(!activeScreen)return;
+  const content=activeScreen.firstElementChild;
+  content.style.transform='none';
+  const scale=Math.min(1,(activeScreen.clientHeight-16)/content.scrollHeight);
+  content.style.transform=`scale(${Math.max(.1,scale)})`;
+}
+function selectScreen(id,focus=false){
+  screens.forEach(screen=>{
+    const active=screen.id===id;
+    screen.element.hidden=!active;
+    if(active){activeScreen=screen.element;screen.button.setAttribute('aria-current','page');}
+    else screen.button.removeAttribute('aria-current');
+  });
+  requestAnimationFrame(fitScreen);
+  if(focus)activeScreen.focus({preventScroll:true});
+}
+screens.forEach(screen=>{
+  const element=document.createElement('section');
+  element.className='screen';element.hidden=true;element.tabIndex=-1;
+  element.setAttribute('aria-label',screen.label);
+  const content=document.createElement('div');content.className='screen-content';
+  screen.nodes.forEach(node=>content.append(node));element.append(content);main.append(element);
+  const button=document.createElement('button');button.textContent=screen.label;
+  button.addEventListener('click',()=>selectScreen(screen.id));screenNav.append(button);
+  screen.element=element;screen.button=button;
+});
+const picker=document.createElement('div');picker.className='project-picker';
+picker.setAttribute('role','group');picker.setAttribute('aria-label','选择项目');
+const projectCards=[...projectsSection.querySelectorAll('.project-card')];
+projectCards.forEach((card,index)=>{
+  const button=document.createElement('button');button.textContent=`0${index+1} ${card.querySelector('h3').textContent}`;
+  button.setAttribute('aria-pressed',String(index===0));card.hidden=index!==0;
+  button.addEventListener('click',()=>{
+    projectCards.forEach((item,i)=>{item.hidden=i!==index;picker.children[i].setAttribute('aria-pressed',String(i===index));});
+    pulse(card,'result-pop');requestAnimationFrame(fitScreen);
+  });picker.append(button);
+});
+projectsSection.querySelector('.section-heading').after(picker);
+document.querySelectorAll('details').forEach(detail=>detail.addEventListener('toggle',()=>requestAnimationFrame(fitScreen)));
+document.querySelectorAll('a[href^="#"]').forEach(link=>link.addEventListener('click',event=>{
+  event.preventDefault();selectScreen(link.getAttribute('href')==='#resume'?'skills':'intro');
+}));
+document.querySelector('footer').classList.add('screen-footer');
+const oldShow=show;
+show=function(name){oldShow(name);requestAnimationFrame(fitScreen);};
+const screenResize=new ResizeObserver(()=>requestAnimationFrame(fitScreen));
+screens.forEach(screen=>screenResize.observe(screen.element.firstElementChild));
+window.addEventListener('resize',fitScreen);
+selectScreen(location.hash==='#projects'?'projects':location.hash==='#resume'?'skills':'intro');
