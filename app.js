@@ -177,3 +177,29 @@ main.addEventListener('keydown',()=>{playing=false;refreshPlayback();});
 document.addEventListener('visibilitychange',refreshPlayback);
 refreshPlayback();
 requestAnimationFrame(fitScreen);
+// Horizontal touch gestures: vertical movement and multi-touch remain untouched.
+let swipeStart = null;
+main.addEventListener('touchstart', event => {
+  if(event.touches.length !== 1){swipeStart=null;return;}
+  const touch=event.touches[0];
+  swipeStart={x:touch.clientX,y:touch.clientY,time:performance.now()};
+},{passive:true});
+main.addEventListener('touchcancel',()=>{swipeStart=null;},{passive:true});
+main.addEventListener('touchend',event=>{
+  if(!swipeStart || event.changedTouches.length!==1)return;
+  const start=swipeStart;swipeStart=null;
+  const touch=event.changedTouches[0];
+  const dx=touch.clientX-start.x,dy=touch.clientY-start.y;
+  if(Math.abs(dx)<50 || Math.abs(dx)<Math.abs(dy)*1.5 || performance.now()-start.time>1200)return;
+  playing=false;
+  if(running || inspecting){refreshPlayback();return;}
+  const direction=dx<0?1:-1;
+  if(screens[carouselIndex].id==='projects'){
+    const current=projectCards.findIndex(card=>!card.hidden),next=current+direction;
+    if(next>=0 && next<projectCards.length){
+      projectCards.forEach((card,index)=>{card.hidden=index!==next;picker.children[index].setAttribute('aria-pressed',String(index===next));});
+      requestAnimationFrame(fitScreen);refreshPlayback();return;
+    }
+  }
+  advanceSlide(direction);
+},{passive:true});
